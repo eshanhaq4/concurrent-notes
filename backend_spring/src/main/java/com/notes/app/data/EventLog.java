@@ -1,6 +1,6 @@
 package com.notes.app.data;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 
 import java.time.Instant;
 
