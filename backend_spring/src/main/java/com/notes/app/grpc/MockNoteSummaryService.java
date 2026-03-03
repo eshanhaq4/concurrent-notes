@@ -6,6 +6,8 @@ import com.notes.app.grpc.NoteSummaryServiceGrpc;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * Note: This is a mock implementation of an AI summary service.
  * We're just using this to demonstrate using gRPC.
@@ -26,8 +28,9 @@ public class MockNoteSummaryService extends NoteSummaryServiceGrpc.NoteSummarySe
 
     // simulate heavy work load time
     try {
-      Thread.sleep(500);
+      Thread.sleep(ThreadLocalRandom.current().nextInt(2000, 5001)); // sleep for 2-5 seconds
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
 
     // creating mock summary
