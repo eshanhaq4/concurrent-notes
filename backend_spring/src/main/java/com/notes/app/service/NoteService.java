@@ -41,12 +41,15 @@ public class NoteService {
     // validate content and color
     Note note = noteRepository.save(new Note(content, color));
 
-    EventLog eLog = new EventLog(UUID.randomUUID().toString(), note.getId().toString(), EventStatus.QUEUED);
+    String eventID = UUID.randomUUID().toString();
+    String noteId = note.getId().toString();
+
+    EventLog eLog = new EventLog(eventID, noteId, EventStatus.QUEUED);
     eventLogRepository.save(eLog);
 
     NoteSummaryEvent event = NoteSummaryEvent.newBuilder()
-        .setEventId(UUID.randomUUID().toString())
-        .setNoteId(note.getId().toString())
+        .setEventId(eventID)
+        .setNoteId(noteId)
         .setContent(content)
         .setTimestamp(System.currentTimeMillis())
         .build();

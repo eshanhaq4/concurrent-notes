@@ -13,6 +13,10 @@ import com.notes.app.grpc.NoteSummaryRequest;
 import com.notes.app.grpc.NoteSummaryResponse;
 import com.notes.app.grpc.NoteSummaryServiceGrpc;
 
+import com.notes.app.data.EventLog;
+import com.notes.app.data.EventLogRepository;
+import com.notes.app.data.EventStatus;
+
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 
@@ -25,10 +29,12 @@ public class NoteSummaryWorker {
 
   @GrpcClient("note-summary-service")
   private NoteSummaryServiceGrpc.NoteSummaryServiceBlockingStub mockSummaryService;
+  private final EventLogRepository eventLogRepository;
 
-  public NoteSummaryWorker(RedisTemplate<String, byte[]> redis, SimpMessagingTemplate socket) {
+  public NoteSummaryWorker(RedisTemplate<String, byte[]> redis, SimpMessagingTemplate socket, EventLogRepository eventLogRepository) {
     this.redis = redis;
     this.socket = socket;
+    this.eventLogRepository = eventLogRepository;
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -59,13 +65,28 @@ public class NoteSummaryWorker {
 
   private void generateSummary(byte[] eventBytes) {    
     try {
-      NoteSummaryEvent noteEvent = NoteSummaryEvent.parseFrom(eventBytes);
-      String noteId = noteEvent.getNoteId();
-      String content = noteEvent.getContent();  
+      NoteSummaryEvent event = NoteSummaryEvent.parseFrom(eventBytes);
+
+      String noteId = event.getNoteId();
+      String content = event.getContent();  
+      String eventId = event.getEventId();
+      long timestamp = event.getTimestamp();
+
+      EventLog eLog = eventLogRepository.findByEventId(eventId)
+      .orElseThrow(() -> new RuntimeException("EventLog not found for eventId: " + eventId));
+      
+      eLog.setStatus(EventStatus.PROCESSING);
+      eventLogRepository.save(eLog);
+      System.out.println("EventLog status now: " + eLog.getStatus());
 
       NoteSummaryResponse response = mockSummaryService.getNoteSummary
       (NoteSummaryRequest.newBuilder().setContent(content).setNoteId(noteId).build());
 
+      eLog.setStatus(EventStatus.COMPLETED);
+      eLog.setSummary(response.getSummary());
+      eventLogRepository.save(eLog);
+      System.out.println("EventLog status now: " + eLog.getStatus());
+      
       String destination = "/topic/note-summaries";
       String payload = noteId + "::" + response.getSummary();
       
