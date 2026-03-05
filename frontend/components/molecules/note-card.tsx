@@ -40,10 +40,10 @@ export function NoteCard({
         <p className="text-xs mt-2 text-gray-600">Processing...</p>
       )}
       {status === "FAILED" && (
-        <p className="text-xs mt-2 text-red-600">Error generating summary</p>
+        <p className="text-xs mt-2 text-red-600">Summary could not be generated</p>
       )}
       {status === "COMPLETED" && summary && (
-        <p className="text-xs mt-2 text-green-600">
+        <p className="text-xs mt-2 text-black font-semibold">
           Summary: {summary}
         </p>
       )}

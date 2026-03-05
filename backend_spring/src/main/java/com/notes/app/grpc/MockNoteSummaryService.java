@@ -34,7 +34,7 @@ public class MockNoteSummaryService extends NoteSummaryServiceGrpc.NoteSummarySe
     }
 
     // creating mock summary
-    String mockSummary = "MockNoteSummaryService.java: This note is about " + request.getContent().length()
+    String mockSummary = "This note is about " + request.getContent().length()
         + " characters.";
 
     NoteSummaryResponse response = NoteSummaryResponse.newBuilder()

@@ -80,7 +80,7 @@ public class NoteSummaryWorker {
       
       eLog.setStatus(EventStatus.PROCESSING);
       eventLogRepository.save(eLog);
-
+      System.out.println("EventLog status now: " + eLog.getStatus());
       String processing = noteId + "::PROCESSING::" + timestamp;
       socket.convertAndSend("/topic/note-summaries", processing);
 

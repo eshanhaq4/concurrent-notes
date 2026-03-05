@@ -14,6 +14,7 @@ export function NotesSocket({onSummaryUpdate}: NoteSummary) {
             onConnect: () => {
                 console.log("Connected to WebSocket");
                 client.subscribe("/topic/note-summaries", (message) => {
+                    console.log("RAW SOCKET MESSAGE:", message.body);
                     const parts = message.body.split("::");
                     const [noteId, status, timestamp, summary] = parts;
                     console.log("Received message:", {noteId, status, timestamp, summary});
