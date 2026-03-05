@@ -1,17 +1,23 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Client } from "@stomp/stompjs";
 
-export function NotesSocket() {
+interface NoteSummary {
+    onSummaryUpdate: (noteId: string, status: string, timestamp: number, summary: string) => void;
+}
+
+export function NotesSocket({onSummaryUpdate}: NoteSummary) {
     useEffect(() => {
         const client = new Client({
-            brokerURL: "ws://localhost:8080/ws",
+            brokerURL: "ws://localhost:8000/ws",
             onConnect: () => {
                 console.log("Connected to WebSocket");
                 client.subscribe("/topic/note-summaries", (message) => {
-                    const [noteId, summary] = message.body.split("::");
-                    console.log(`Received summary for note ${noteId}: ${summary}`);
+                    const parts = message.body.split("::");
+                    const [noteId, status, timestamp, summary] = parts;
+                    console.log("Received message:", {noteId, status, timestamp, summary});
+                    onSummaryUpdate(noteId, status, Number(timestamp), summary);
                 });
             },
             onStompError: (frame) => {
@@ -24,7 +30,7 @@ export function NotesSocket() {
         return () => {
             client.deactivate();
         };
-    }, []);
+    }, [onSummaryUpdate]);
 
     return null;
 }

@@ -32,4 +32,12 @@ public class NoteController {
     public Note createNote(@Argument NoteInput input) {
         return noteService.createNote(input.getContent(), input.getColor() != null ? input.getColor() : "#FCA5A5");
     }
+    @MutationMapping
+    public Note updateNote(@Argument Long noteId, @Argument NoteInput input) {
+        return noteService.updateNote(noteId, input.getContent(), input.getColor());
+    }
+    @MutationMapping
+    public Boolean deleteNote(@Argument Long noteId) {
+        return noteService.deleteNote(noteId);
+    }
 }

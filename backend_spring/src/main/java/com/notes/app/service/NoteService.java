@@ -59,4 +59,21 @@ public class NoteService {
 
     return note;
   }
+  public Note updateNote(Long noteId, String content, String color) {
+    Note note = noteRepository.findById(noteId).orElseThrow(() -> new RuntimeException("Note not found"));
+
+    note.setContent(content);
+    note.setColor(color);
+    
+    return noteRepository.save(note);
+  }
+
+  public Boolean deleteNote(Long noteId) {
+    if (!noteRepository.existsById(noteId)) {
+      return false;
+    }
+    noteRepository.deleteById(noteId);
+
+    return true;
+  }
 }

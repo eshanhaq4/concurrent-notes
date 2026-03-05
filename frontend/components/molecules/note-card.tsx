@@ -2,6 +2,8 @@ interface NoteCardProps {
   content: string;
   color?: string;
   date?: string;
+  summary?: string;
+  status?: string;
   onClick?: () => void;
 }
 
@@ -9,6 +11,8 @@ export function NoteCard({
   content,
   color = "#FCA5A5",
   date,
+  summary,
+  status,
   onClick,
 }: NoteCardProps) {
   return (
@@ -32,6 +36,17 @@ export function NoteCard({
       <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">
         {content}
       </p>
+      {status === "PROCESSING" && (
+        <p className="text-xs mt-2 text-gray-600">Processing...</p>
+      )}
+      {status === "FAILED" && (
+        <p className="text-xs mt-2 text-red-600">Error generating summary</p>
+      )}
+      {status === "COMPLETED" && summary && (
+        <p className="text-xs mt-2 text-green-600">
+          Summary: {summary}
+        </p>
+      )}
       {date && (
         <time
           className="text-xs text-gray-600 mt-4"

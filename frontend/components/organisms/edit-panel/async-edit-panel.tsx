@@ -7,13 +7,33 @@ async function fetchNoteById(id: string): Promise<Note | null> {
   // To simulate DB latency, uncomment the following line:
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  const response = await fetch(`${API_URL}/api/notes/${id}`, {
-    cache: "no-store",
+  const response = await fetch(`${API_URL}/graphql`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: `
+        query GetNoteById($noteId: ID!) {
+          note(noteId: $noteId) {
+            id
+            content
+            color
+            updatedAt
+          }
+        }
+      `,
+      variables: { noteId: id },
+    }),
   });
+
   if (!response.ok) {
+    console.error("Failed to fetch note:", response.statusText);
     return null;
   }
-  return response.json();
+  const result = await response.json();
+  console.log("fetchNoteById result:", result);
+  return result.data.note;
 }
 
 interface AsyncEditPanelProps {

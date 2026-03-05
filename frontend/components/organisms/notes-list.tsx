@@ -1,6 +1,9 @@
-import { Suspense } from "react";
+'use client';
+
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { NoteCard } from "@/components/molecules/note-card";
+import { EditPanel } from "@/components/organisms/edit-panel/edit-panel";
 import { AsyncEditPanel } from "@/components/organisms/edit-panel/async-edit-panel";
 import { EditPanelSkeleton } from "@/components/organisms/edit-panel/edit-panel-skeleton";
 import { Note } from "@/types/note";
@@ -40,8 +43,31 @@ interface NotesListProps {
   selectedNoteId?: string;
 }
 
-export async function NotesList({ selectedNoteId }: NotesListProps) {
-  const notes = await fetchNotes();
+export function NotesList({ selectedNoteId }: NotesListProps) {
+  const [notes, setNotes] = useState<Note[]>([]);
+
+  const [summaries, setSummaries] = useState<{ [key: string]: { status: string; timestamp: number; summary: string } }>({});
+  const selectedNote = notes.find((note) => note.id === selectedNoteId);
+
+  useEffect(() => {
+    fetchNotes().then(setNotes).catch((error) => {
+      console.error("Failed to fetch notes:", error);
+    });
+  }, [selectedNoteId]);
+
+  function handleSummaryUpdate(noteId: string, status: string, timestamp: number, summary: string) {
+    console.log("Handling summary update:", {noteId, status, timestamp, summary});
+    setSummaries((prev) => {
+      if (prev[noteId] && prev[noteId].timestamp > timestamp) {
+        console.warn(`Received out-of-order summary update for note ${noteId}. Ignoring.`);
+        return prev;
+      }
+        return {
+        ...prev,
+        [noteId]: { status, timestamp, summary },
+      };
+    });
+  }
 
   if (notes.length === 0) {
     return (
@@ -53,7 +79,7 @@ export async function NotesList({ selectedNoteId }: NotesListProps) {
 
   return (
     <div className="flex gap-6">
-      <NotesSocket />
+      <NotesSocket onSummaryUpdate={handleSummaryUpdate} />
       <ul className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-max list-none flex-1">
         {notes.map((note) => (
           <li key={note.id}>
@@ -61,17 +87,17 @@ export async function NotesList({ selectedNoteId }: NotesListProps) {
               <NoteCard
                 content={note.content}
                 color={note.color}
-                date={note.date}
+                date={note.updatedAt}
+                summary={summaries[note.id]?.summary}
+                status={summaries[note.id]?.status}
               />
             </Link>
           </li>
         ))}
       </ul>
 
-      {selectedNoteId && (
-        <Suspense key={selectedNoteId} fallback={<EditPanelSkeleton />}>
-          <AsyncEditPanel noteId={selectedNoteId} />
-        </Suspense>
+      {selectedNote && (
+          <EditPanel initialNote={selectedNote} />
       )}
     </div>
   );

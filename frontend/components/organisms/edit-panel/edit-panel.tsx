@@ -11,7 +11,7 @@ interface EditPanelProps {
   initialNote: Note;
 }
 
-const API_URL = "/api/notes";
+const API_URL = "http://127.0.0.1:8000/graphql";
 
 export function EditPanel({ initialNote }: EditPanelProps) {
   const router = useRouter();
@@ -20,20 +20,35 @@ export function EditPanel({ initialNote }: EditPanelProps) {
     content: string;
     color: string;
   }) => {
-    const response = await fetch(`${API_URL}/${initialNote.id}`, {
-      method: "PUT",
+    const response = await fetch(API_URL, {
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        content: updatedNote.content,
-        color: updatedNote.color,
+        query: `
+          mutation UpdateNote($noteId: ID!, $input: NoteInput!) {
+            updateNote(noteId: $noteId, input: $input) {
+              id
+              content
+              color
+              updatedAt
+            }
+          }
+        `,
+        variables: {
+          noteId: initialNote.id,
+          input: {
+            content: updatedNote.content,
+            color: updatedNote.color,
+          }
+        },
       }),
     });
 
     if (response.ok) {
-      router.refresh();
       router.push("/");
+      router.refresh();
     }
   };
 
@@ -42,9 +57,21 @@ export function EditPanel({ initialNote }: EditPanelProps) {
       return;
     }
 
-    const response = await fetch(`${API_URL}/${initialNote.id}`, {
-      method: "DELETE",
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: `
+          mutation DeleteNote($noteId: ID!) {
+            deleteNote(noteId: $noteId)
+          }
+        `,
+        variables: { noteId: initialNote.id },
+      }),
     });
+
 
     if (response.ok) {
       router.refresh();

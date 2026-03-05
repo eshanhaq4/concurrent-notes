@@ -64,20 +64,25 @@ public class NoteSummaryWorker {
   }
 
   private void generateSummary(byte[] eventBytes) {    
+    EventLog eLog = null;
+    long timestamp = 0;
+
     try {
       NoteSummaryEvent event = NoteSummaryEvent.parseFrom(eventBytes);
 
       String noteId = event.getNoteId();
       String content = event.getContent();  
       String eventId = event.getEventId();
-      long timestamp = event.getTimestamp();
+      timestamp = event.getTimestamp();
 
-      EventLog eLog = eventLogRepository.findByEventId(eventId)
+      eLog = eventLogRepository.findByEventId(eventId)
       .orElseThrow(() -> new RuntimeException("EventLog not found for eventId: " + eventId));
       
       eLog.setStatus(EventStatus.PROCESSING);
       eventLogRepository.save(eLog);
-      System.out.println("EventLog status now: " + eLog.getStatus());
+
+      String processing = noteId + "::PROCESSING::" + timestamp;
+      socket.convertAndSend("/topic/note-summaries", processing);
 
       NoteSummaryResponse response = mockSummaryService.getNoteSummary
       (NoteSummaryRequest.newBuilder().setContent(content).setNoteId(noteId).build());
@@ -87,16 +92,22 @@ public class NoteSummaryWorker {
       eventLogRepository.save(eLog);
       System.out.println("EventLog status now: " + eLog.getStatus());
       
-      String destination = "/topic/note-summaries";
-      String payload = noteId + "::" + response.getSummary();
+      String payload = noteId + "::COMPLETED::" + timestamp + "::" + response.getSummary();
       
-      socket.convertAndSend(destination, payload);
+      socket.convertAndSend("/topic/note-summaries", payload);
      
-      System.out.println("NoteSummaryWorker.java: Sent to WebSocket " + destination + ": " + payload);
+      System.out.println("NoteSummaryWorker.java: Sent to WebSocket /topic/note-summaries: " + payload);
 
     } catch (Exception e) {
       System.err.println("Failed to parse NoteSummaryEvent: " + e.getMessage());
       e.printStackTrace();
+      if (eLog != null) {
+        eLog.setStatus(EventStatus.FAILED);
+        eventLogRepository.save(eLog);
+
+        String failed = eLog.getNoteId() + "::FAILED::" + timestamp + "::" + e.getMessage();
+        socket.convertAndSend("/topic/note-summaries", failed);
+      }
     }
     /**
      * Paste into localhost:8000 dev console to test WebSocket connection:

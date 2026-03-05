@@ -5,7 +5,7 @@ import { NoteForm } from "@/components/organisms/note-form";
 import { Header } from "@/components/organisms/header";
 import { useState } from "react";
 
-const API_URL = "/api/notes";
+const API_URL = "http://127.0.0.1:8000/graphql";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
@@ -28,8 +28,20 @@ export default function AddNotePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          content: note.content,
-          color: note.color,
+          query: `
+            mutation CreateNote($content: String!, $color: String) {
+              createNote(input: {content: $content, color: $color}) {
+                id
+                content
+                color
+                updatedAt
+              }
+            }
+          `,
+          variables: {
+            content: note.content,
+            color: note.color,
+          },
         }),
       });
 
