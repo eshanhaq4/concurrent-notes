@@ -15,6 +15,11 @@ export function NoteCard({
   status,
   onClick,
 }: NoteCardProps) {
+  console.log("NoteCard render:", {
+    content,
+    status,
+    summary
+  });
   return (
     <article
       onClick={onClick}

@@ -1,11 +1,9 @@
 'use client';
 
-import { Suspense, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { NoteCard } from "@/components/molecules/note-card";
 import { EditPanel } from "@/components/organisms/edit-panel/edit-panel";
-import { AsyncEditPanel } from "@/components/organisms/edit-panel/async-edit-panel";
-import { EditPanelSkeleton } from "@/components/organisms/edit-panel/edit-panel-skeleton";
 import { Note } from "@/types/note";
 import { NotesSocket } from "@/components/organisms/notes-socket";
 
@@ -46,34 +44,45 @@ interface NotesListProps {
 export function NotesList({ selectedNoteId }: NotesListProps) {
   const [notes, setNotes] = useState<Note[]>([]);
 
-  const [summaries, setSummaries] = useState<{ [key: string]: { status: string; timestamp: number; summary: string } }>({});
+  const [summaries, setSummaries] = useState<Record<string, { status: "PROCESSING" | "COMPLETED" | "FAILED"; timestamp: number; summary?: string }>>({});
   const selectedNote = notes.find((note) => note.id === selectedNoteId);
 
   useEffect(() => {
     fetchNotes().then(setNotes).catch((error) => {
       console.error("Failed to fetch notes:", error);
     });
-  }, [selectedNoteId]);
+  }, []);
 
-  function handleSummaryUpdate(noteId: string, status: string, timestamp: number, summary: string) {
-    console.log("Handling summary update:", {noteId, status, timestamp, summary});
+  const handleSummaryUpdate = useCallback((noteId: string, status: "PROCESSING" | "COMPLETED" | "FAILED", timestamp: number, summary?: string) => {
+    const normalizedNoteId = String(noteId);
+
+    console.log("Handling summary update:", { noteId: normalizedNoteId, status, timestamp, summary });
     setSummaries((prev) => {
-      if (prev[noteId] && prev[noteId].timestamp > timestamp) {
-        console.warn(`Received out-of-order summary update for note ${noteId}. Ignoring.`);
+      if (prev[normalizedNoteId] && prev[normalizedNoteId].timestamp > timestamp) {
+        console.warn(`Received out-of-order summary update for note ${normalizedNoteId}. Ignoring.`);
         return prev;
       }
-        return {
+
+      if (status === "PROCESSING" && prev[normalizedNoteId]?.status === "COMPLETED") {
+        console.warn(`Received PROCESSING status for note ${normalizedNoteId} which is already COMPLETED. Ignoring.`);
+        return prev;
+      }
+
+      return {
         ...prev,
-        [noteId]: { status, timestamp, summary },
+        [normalizedNoteId]: { status, timestamp, summary },
       };
     });
-  }
+  }, []);
 
   if (notes.length === 0) {
     return (
-      <p className="text-center py-12 text-gray-600">
-        No notes yet. Add your first note!
-      </p>
+      <>
+        <NotesSocket onSummaryUpdate={handleSummaryUpdate} />
+        <p className="text-center py-12 text-gray-600">
+          No notes yet. Add your first note!
+        </p>
+      </>
     );
   }
 
@@ -88,8 +97,8 @@ export function NotesList({ selectedNoteId }: NotesListProps) {
                 content={note.content}
                 color={note.color}
                 date={note.updatedAt}
-                summary={summaries[note.id]?.summary}
-                status={summaries[note.id]?.status}
+                summary={summaries[String(note.id)]?.summary}
+                status={summaries[String(note.id)]?.status}
               />
             </Link>
           </li>

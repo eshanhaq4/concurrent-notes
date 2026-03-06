@@ -5,7 +5,6 @@ import com.notes.app.data.NoteRepository;
 import com.notes.app.data.EventLog;
 import com.notes.app.data.EventLogRepository;
 import com.notes.app.data.EventStatus;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.data.redis.core.RedisTemplate;
 
@@ -37,18 +36,17 @@ public class NoteService {
     return noteRepository.findById(noteId);
   }
 
-  public Note createNote(String content, String color) {
-    // validate content and color
-    Note note = noteRepository.save(new Note(content, color));
+  private void queueSummaryEvent(Note note) {
 
-    String eventID = UUID.randomUUID().toString();
+    String content = note.getContent();
+    String eventId = UUID.randomUUID().toString();
     String noteId = note.getId().toString();
 
-    EventLog eLog = new EventLog(eventID, noteId, EventStatus.QUEUED);
+    EventLog eLog = new EventLog(eventId, noteId, EventStatus.QUEUED);
     eventLogRepository.save(eLog);
 
     NoteSummaryEvent event = NoteSummaryEvent.newBuilder()
-        .setEventId(eventID)
+        .setEventId(eventId)
         .setNoteId(noteId)
         .setContent(content)
         .setTimestamp(System.currentTimeMillis())
@@ -56,22 +54,37 @@ public class NoteService {
 
     redis.opsForList().rightPush(NOTE_SUMMARY_EVENT_QUEUE, event.toByteArray());
     System.out.println("NoteService.java: Queued summary job for note: " + note.getId());
+  }
+
+  public Note createNote(String content, String color) {
+
+    Note note = noteRepository.save(new Note(content, color));
+    queueSummaryEvent(note);
 
     return note;
   }
-  public Note updateNote(Long noteId, String content, String color) {
-    Note note = noteRepository.findById(noteId).orElseThrow(() -> new RuntimeException("Note not found"));
 
+  public Note updateNote(Long noteId, String content, String color) {
+
+    Note note = noteRepository.findById(noteId).orElseThrow(() -> new RuntimeException("Note not found"));
     note.setContent(content);
-    note.setColor(color);
-    
-    return noteRepository.save(note);
+
+    if (color != null) {
+      note.setColor(color);
+    }
+
+    Note updatedNote = noteRepository.save(note);
+    queueSummaryEvent(updatedNote);
+
+    return updatedNote;
   }
 
   public Boolean deleteNote(Long noteId) {
+
     if (!noteRepository.existsById(noteId)) {
       return false;
     }
+
     noteRepository.deleteById(noteId);
 
     return true;

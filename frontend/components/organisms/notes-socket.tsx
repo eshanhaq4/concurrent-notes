@@ -3,8 +3,15 @@
 import { useEffect } from "react";
 import { Client } from "@stomp/stompjs";
 
+interface Summary {
+  noteId: string;
+  status: "PROCESSING" | "COMPLETED" | "FAILED";
+  timestamp: number;
+  summary?: string;
+}
+
 interface NoteSummary {
-    onSummaryUpdate: (noteId: string, status: string, timestamp: number, summary: string) => void;
+    onSummaryUpdate: (noteId: string, status: "PROCESSING" | "COMPLETED" | "FAILED", timestamp: number, summary?: string) => void;
 }
 
 export function NotesSocket({onSummaryUpdate}: NoteSummary) {
@@ -15,10 +22,15 @@ export function NotesSocket({onSummaryUpdate}: NoteSummary) {
                 console.log("Connected to WebSocket");
                 client.subscribe("/topic/note-summaries", (message) => {
                     console.log("RAW SOCKET MESSAGE:", message.body);
-                    const parts = message.body.split("::");
-                    const [noteId, status, timestamp, summary] = parts;
-                    console.log("Received message:", {noteId, status, timestamp, summary});
-                    onSummaryUpdate(noteId, status, Number(timestamp), summary);
+                    try {
+                    const data: Summary = JSON.parse(message.body);
+                    const { noteId, status, timestamp, summary } = data;
+
+                        console.log("Received message:", { noteId, status, timestamp, summary });
+                        onSummaryUpdate(noteId, status, timestamp, summary);
+                    } catch (error) {
+                        console.error("Error parsing message:", error);
+                    }
                 });
             },
             onStompError: (frame) => {

@@ -3,7 +3,6 @@ package com.notes.app.worker;
 import java.time.Duration;
 
 import org.springframework.context.event.EventListener;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -40,8 +39,7 @@ public class NoteSummaryWorker {
   @EventListener(ApplicationReadyEvent.class)
   public void startWorker() {
     new Thread(() -> {
-      System.out
-          .println("NoteSummaryWorker.java: Summary Worker started. Listening for note_summary_event_queue events");
+      System.out.println("NoteSummaryWorker.java: Summary Worker started. Listening for note_summary_event_queue events");
       while (true) {
         try {
           byte[] eventBytes = redis.opsForList().leftPop("note_summary_event_queue", Duration.ofSeconds(30));
@@ -80,33 +78,43 @@ public class NoteSummaryWorker {
       
       eLog.setStatus(EventStatus.PROCESSING);
       eventLogRepository.save(eLog);
-      System.out.println("EventLog status now: " + eLog.getStatus());
-      String processing = noteId + "::PROCESSING::" + timestamp;
+
+      String processing = "{\"noteId\":\"" + noteId + "\", \"status\":\"PROCESSING\", \"timestamp\":" + timestamp + "}";
       socket.convertAndSend("/topic/note-summaries", processing);
 
       NoteSummaryResponse response = mockSummaryService.getNoteSummary
       (NoteSummaryRequest.newBuilder().setContent(content).setNoteId(noteId).build());
 
+      String summary = response.getSummary();
+
+      if (summary == null || summary.isBlank()) {
+        throw new RuntimeException("Summary could not be generated");
+      }
+
       eLog.setStatus(EventStatus.COMPLETED);
-      eLog.setSummary(response.getSummary());
+      eLog.setSummary(summary);
       eventLogRepository.save(eLog);
-      System.out.println("EventLog status now: " + eLog.getStatus());
-      
-      String payload = noteId + "::COMPLETED::" + timestamp + "::" + response.getSummary();
-      
+
+      String payload = "{\"noteId\":\"" + noteId + "\", \"status\":\"COMPLETED\", \"timestamp\":" + timestamp + ", \"summary\":\"" + summary + "\"}";
       socket.convertAndSend("/topic/note-summaries", payload);
      
       System.out.println("NoteSummaryWorker.java: Sent to WebSocket /topic/note-summaries: " + payload);
 
     } catch (Exception e) {
-      System.err.println("Failed to parse NoteSummaryEvent: " + e.getMessage());
+      System.err.println("NoteSummaryWorker.java: Error processing event: " + e.getMessage());
       e.printStackTrace();
+      
       if (eLog != null) {
+        String summary = "Summary could not be generated";
+        String noteId = eLog.getNoteId();
+
         eLog.setStatus(EventStatus.FAILED);
+        eLog.setSummary(summary);
         eventLogRepository.save(eLog);
 
-        String failed = eLog.getNoteId() + "::FAILED::" + timestamp + "::" + e.getMessage();
+        String failed = "{\"noteId\":\"" + noteId + "\", \"status\":\"FAILED\", \"timestamp\":" + timestamp + ", \"summary\":\"" + summary + "\"}";
         socket.convertAndSend("/topic/note-summaries", failed);
+        System.out.println("NoteSummaryWorker.java: Sent to WebSocket /topic/note-summaries: " + failed);
       }
     }
     /**
