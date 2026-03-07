@@ -57,6 +57,16 @@ export function NotesList({ selectedNoteId }: NotesListProps) {
     const normalizedNoteId = String(noteId);
 
     console.log("Handling summary update:", { noteId: normalizedNoteId, status, timestamp, summary });
+
+    const noteExists = notes.some((note) => String(note.id) === normalizedNoteId);
+    if (!noteExists) {
+      fetchNotes().then((fetchedNotes) => {
+        setNotes(fetchedNotes);
+      }).catch((error) => {
+        console.error("Failed to refetch notes:", error);
+      });
+    }
+
     setSummaries((prev) => {
       if (prev[normalizedNoteId] && prev[normalizedNoteId].timestamp > timestamp) {
         console.warn(`Received out-of-order summary update for note ${normalizedNoteId}. Ignoring.`);
