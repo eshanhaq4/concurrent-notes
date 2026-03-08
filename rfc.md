@@ -5,6 +5,7 @@
 This project extends the “Notes” prototype project into a more thorough, asynchronous pipeline that extends functionality for summary generation. A user should be able to create, edit, and delete notes through the Next.js UI, while note summaries are generated in the background. Moreover, when features like the summary displays, adding notes, editing notes, should all happen in real-time as the UI is running. The system should be able to track an event’s lifecycle using an EventLog, which includes tracking the states of QUEUED, PROCESSING, COMPLETED, and FAILED. There should also be concurrency to make sure that the system works as intended if the user edits a note twice fairly quickly. On the frontend, summaries should appear in real time through WebSocket updates, with the UI showing the intermediate PROCESSING state, the final COMPLETED state, and FAILED in the case of any errors.
 
 **System Diagram**
+![System Diagram](SystemDiagram.jpg)
 
 **Tradeoffs**
 
@@ -15,5 +16,6 @@ It’s crucial to look at the gRPC vs. GraphQL vs. REST tradeoffs. gRPC is the b
 The main race condition occurs when the same note is edited twice quickly. Lets say the first edit, edit A, creates Event A which has a timestamp of t1, and the second edit, edit B, creates Event B, with timestamp t2. Both events are pushed to Redis. If Event B finishes first, the worker sends a COMPLETED WebSocket message containing the newer summary and timestamp t2, and the frontend stores that summary for the note. After, Event A finishes and sends another COMPLETED message, but now with the older timestamp t1. Without a proper guard, the summary from Edit A would overwrite the correct summary of Edit B. The fix is the timestamp guard, which is that when a WebSocket message arrives, the frontend compares the timestamp of the message against the timestamp currently stored for that note and only applies the update if the incoming timestamp is greater (newer). This prevents stale summaries from appearing in the UI even if the edit order is different.
 
 **Sequence Diagram**
+![Sequence Diagram](SequenceDiagram.jpg)
 
 
