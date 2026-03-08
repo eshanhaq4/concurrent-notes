@@ -212,3 +212,6 @@ The Spring Boot backend sends real-time note summary updates via WebSocket. To t
 ## UI Design Citation
 
 From https://dribbble.com/shots/14037848-Docket-note-Side-menu
+
+## VIDEO DEMO SUBMISSION LINK:
+[https://drive.google.com/file/d/1AtzCkcUQU6nQXuuT2pDUsFkH2nqvjVwE/view?usp=sharing](url)
