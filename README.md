@@ -30,8 +30,6 @@ A background worker consumes those events, updates their processing state, and c
 
 Because multiple edits to the same note can finish out of order, the frontend compares event timestamps and ignores stale updates rather than allowing an older result to replace a newer one.
 
-Additional design decisions and concurrency considerations are documented in [`rfc.md`](rfc.md).
-
 ## Running Locally
 
 ### Prerequisites
