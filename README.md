@@ -1,66 +1,55 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/CJaR7DvQ)
-[![Open in Visual Studio Code](https://classroom.github.com/assets/open-in-vscode-2e0aaae1b6195c2367325f4f02e2d04e9abb55f0b24a779b69b11b9e10269abc.svg)](https://classroom.github.com/online_ide?assignment_repo_id=22890643&assignment_repo_type=AssignmentRepo)
-# Notes Application
+# Concurrent Notes
 
-A full-stack notes application built with Next.js (frontend) and Spring Boot (backend), featuring GraphQL, gRPC, Redis event queuing, and WebSocket real-time updates.
+A full-stack notes application designed around asynchronous processing and real-time updates. Users can create, edit, and delete notes while background summary jobs are queued and processed independently.
 
 ## Features
 
-- Create, read, update, and delete notes
-- Color-coded notes with customizable colors
-- Master-detail view with inline editing
-- Real-time note summaries via async worker pipeline
+- Create, edit, delete, and view notes
+- Customize note colors
+- Process note summaries asynchronously through a Redis-backed queue
+- Track background jobs through `QUEUED`, `PROCESSING`, `COMPLETED`, and `FAILED` states
+- Communicate between the worker and summary service using gRPC and Protocol Buffers
+- Push processing updates to the frontend in real time with WebSockets and STOMP
+- Prevent stale summary results from overwriting newer edits using timestamp-based ordering
+- Persist notes and event state with Spring Data JPA and H2
 
-## Project Structure
+## Tech Stack
 
-```
-w1_basic_notes/
-├── frontend/          # Next.js frontend application
-│   ├── app/          # Next.js app directory
-│   ├── components/   # Atomic Design components
-│   └── ...
-└── backend_spring/    # Spring Boot backend (GraphQL + gRPC)
-    ├── src/main/java/com/notes/app/
-    ├── src/main/proto/
-    └── pom.xml
-```
+**Frontend:** Next.js, React, TypeScript, Tailwind CSS  
+**Backend:** Java, Spring Boot, GraphQL  
+**Async & Real-Time:** Redis, gRPC, Protocol Buffers, WebSockets, STOMP  
+**Database:** H2
 
-## Prerequisites
+## Architecture
 
-- Node.js (v18 or higher)
-- Java 17 or higher
+The application separates interactive note operations from background summary processing.
+
+The Next.js frontend communicates with the Spring Boot backend through GraphQL for note queries and mutations. When a note is created or edited, the backend creates an event record and places a serialized summary job onto a Redis queue.
+
+A background worker consumes those events, updates their processing state, and calls a gRPC summary service. Processing and completion events are then published to the frontend through WebSockets so that users can see updates without refreshing the page.
+
+Because multiple edits to the same note can finish out of order, the frontend compares event timestamps and ignores stale updates rather than allowing an older result to replace a newer one.
+
+Additional design decisions and concurrency considerations are documented in [`rfc.md`](rfc.md).
+
+## Running Locally
+
+### Prerequisites
+
+- Node.js
+- Java 17+
 - Maven
-- Docker (for Redis)
+- Redis
 
-## Running the Full Stack
+### Start Redis
 
-### 1. Start Redis
-
-**Option A: Using Docker (recommended)**
-
-First, install Docker Desktop: https://docs.docker.com/get-docker/
-
-Then run Redis:
+Using Docker:
 
 ```bash
 docker run -d --name redis -p 6379:6379 redis
 ```
 
-To stop/start later:
-
-```bash
-docker stop redis
-docker start redis
-```
-
-**Option B: Using Homebrew (macOS)**
-
-```bash
-brew install redis
-brew services start redis
-```
-
-### 2. Start the Spring Boot Backend
+### Backend
 
 ```bash
 cd backend_spring
@@ -68,29 +57,21 @@ mvn clean install
 mvn spring-boot:run
 ```
 
-The backend will be available at:
+The backend runs on:
 
-- GraphQL endpoint: http://localhost:8000/graphql
-- GraphiQL Playground: http://localhost:8000
-- H2 Database Console: http://localhost:8000/h2-console
+```text
+http://localhost:8000
+```
 
-#### GraphiQL Playground
+GraphQL is available at:
 
-Open http://localhost:8000 in your browser to get an interactive GraphQL IDE where you can write and test queries/mutations against the API.
+```text
+http://localhost:8000/graphql
+```
 
-#### H2 Database Console
+### Frontend
 
-Open http://localhost:8000/h2-console to inspect the database directly. Use these connection settings:
-
-| Setting     | Value                      |
-|-------------|----------------------------|
-| JDBC URL    | `jdbc:h2:file:./data/notesdb` |
-| User Name   | `sa`                       |
-| Password    | *(leave blank)*            |
-
-Once connected, you can run SQL queries to view tables and data (e.g., `SELECT * FROM NOTES`).
-
-### 3. Start the Frontend
+In a separate terminal:
 
 ```bash
 cd frontend
@@ -98,120 +79,8 @@ npm install
 npm run dev
 ```
 
-The frontend will be available at http://localhost:3000
+Then open:
 
-## Building gRPC/Protobuf
-
-The Spring Boot backend uses gRPC for service communication. Proto files are located in `backend_spring/src/main/proto/`.
-
-To compile protos and generate Java stubs:
-
-```bash
-cd backend_spring
-mvn clean compile
+```text
+http://localhost:3000
 ```
-
-This generates Java classes in `target/generated-sources/protobuf/`. If your IDE doesn't recognize the imports, reload the Maven project.
-
-## GraphQL API
-
-Endpoint: `POST /graphql`
-
-**Queries:**
-
-```graphql
-query {
-  notes {
-    id
-    content
-    color
-    updatedAt
-  }
-  note(noteId: "123") {
-    id
-    content
-    color
-    updatedAt
-  }
-}
-```
-
-**Mutations:**
-
-```graphql
-mutation {
-  createNote(input: { content: "Hello", color: "#FCA5A5" }) {
-    id
-  }
-}
-```
-
-## Testing WebSocket
-
-The Spring Boot backend sends real-time note summary updates via WebSocket. To test:
-
-1. **Start Redis and the Spring Boot server** (see above)
-
-2. **Open http://localhost:8000/graphiql in your browser**
-
-3. **Open the browser dev console (F12) and paste:**
-
-   ```javascript
-   const script = document.createElement("script");
-   script.src =
-     "https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js";
-   script.onload = () => {
-     const client = new StompJs.Client({
-       brokerURL: "ws://localhost:8000/ws",
-       debug: (str) => console.log(str),
-       onConnect: () => {
-         console.log("Connected!");
-         client.subscribe("/topic/note-summaries", (msg) => {
-           console.log("Received:", msg.body);
-         });
-       },
-     });
-     client.activate();
-     window.stompClient = client;
-   };
-   document.head.appendChild(script);
-   ```
-
-4. **Create a note via GraphQL:**
-
-   ```graphql
-   mutation {
-     createNote(input: { content: "Hello world!", color: "#FCA5A5" }) {
-       id
-     }
-   }
-   ```
-
-5. **Watch the console** - you'll see the summary appear.
-
-## Technology Stack
-
-**Frontend:**
-
-- Next.js 15
-- React 19
-- TypeScript
-- Tailwind CSS
-
-**Backend (Spring Boot):**
-
-- Spring Boot 3.2
-- Spring for GraphQL
-- Spring Data JPA
-- H2 Database
-- Redis (for job queuing)
-- WebSocket/STOMP (for real-time updates)
-- gRPC (for service communication)
-- Java 17+
-
-## UI Design Citation
-
-From https://dribbble.com/shots/14037848-Docket-note-Side-menu
-
-## VIDEO DEMO SUBMISSION LINK:
-[https://drive.google.com/file/d/1AtzCkcUQU6nQXuuT2pDUsFkH2nqvjVwE/view?usp=sharing](url)
